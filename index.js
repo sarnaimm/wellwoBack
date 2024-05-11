@@ -3,8 +3,11 @@ const mysql = require("mysql2");
 const bodyParser = require("body-parser"); 
 
 const app = express(); 
+const cors=require("cors");
+app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+
 const bcrypt = require('bcrypt');
 
 const connection = mysql.createConnection({
@@ -28,6 +31,19 @@ app.listen(port, () => {
 });
 
 //USER
+
+
+app.get("/user/:userId", (req, res)=>{
+    const { userId } = req.params;
+    connection.query('SELECT * from users WHERE userId = ?', [userId], (error, results)=> {
+        if (error) {
+            console.error("Error executing query:"+ error);
+            res.status(500).send("Error retrieving users");
+            return;
+        }
+        res.json(results);
+    });
+});
 
 app.get("/users", (req, res)=>{
     connection.query('SELECT * from users ', (error, results)=> {
@@ -73,12 +89,15 @@ app.post("/login", function(req, response)  {
             response.status(409).send("user not found");
             return;
         }
-        
-        bcrypt.compare(password, result[0].password, (err, passmatch) => {
+        const hashedPassword = result[0].password.replace("$2y$", "$2a$");   
+        console.log("bichsen password", password);
+        console.log("hereglegchiin password", hashedPassword)     
+        bcrypt.compare(password, hashedPassword, (err, passmatch) => {
+            console.log("ererererere", passmatch)
             if (passmatch) {
-                console.log("Successful login"); response.send({success: true})
+                console.log("Successful login"); response.send({success: true, data: result[0]})
             } else {
-                console.log("Incorrect password");response.send({err:"password wrong"})
+                console.log("Incorrect password");response.status(500).send({err:"password wrong"})
             }
         });
     });
@@ -87,16 +106,29 @@ app.post("/login", function(req, response)  {
 
 //COMPANY
 
-app.get("/company", (req, res)=>{
-    connection.query('SELECT * from company ', (error, results)=> {
+app.get("/company/all", (req, res)=>{
+    connection.query('SELECT * FROM company ', (error, results)=> {
         if (error) {
-            console.error("Error executing query:"+ error);
+            console.error("Error executing query: " + error);
             res.status(500).send("Error retrieving company");
             return;
         }
         res.json(results);
     });
 });
+
+app.get("/company/:companyId", (req, res)=>{
+    const { companyId } = req.params;
+    connection.query('SELECT * FROM company WHERE companyId = ?', [companyId], (error, results)=> {
+        if (error) {
+            console.error("Error executing query: " + error);
+            res.status(500).send("Error retrieving company");
+            return;
+        }
+        res.json(results);
+    });
+});
+
 
 app.post("/company/register", (req, res) => {
     const {company_name, company_register, email, password, country, field_of_operation, location, created_year, instagram, facebook, website, vision, mission, add_information } = req.body;
@@ -155,6 +187,46 @@ app.patch('/company/edit/:companyId', (req, res) => {
 });
 
 
+
+app.patch('/company/edit/one/:companyId', (req, res) => {
+    const { companyId } = req.params
+    const { email, field_of_operation, location, created_year, website } = req.body;
+    connection.query(`UPDATE company set email="${email}", field_of_operation="${field_of_operation}",location="${location}", created_year=${created_year}, website="${website}" WHERE companyId = ${companyId}`, [email, field_of_operation, location, created_year, website], (error, results) => {
+        if (error) {
+            console.error("Error executing query: " + error);
+            res.status(500).send("Error updating company");
+            return;
+        }
+        res.status(200).send("Successful");
+    });
+});
+
+app.patch('/company/edit/two/:companyId', (req, res) => {
+    const { companyId } = req.params
+    const { instagram, facebook, website} = req.body;
+    connection.query(`UPDATE company set instagram="${instagram}", facebook="${facebook}", website="${website}" WHERE companyId = ${companyId}`, [instagram, facebook, website], (error, results) => {
+        if (error) {
+            console.error("Error executing query: " + error);
+            res.status(500).send("Error updating company");
+            return;
+        }
+        res.status(200).send("Successful");
+    });
+});
+
+app.patch('/company/edit/three/:companyId', (req, res) => {
+    const { companyId } = req.params
+    const { vision, mission, add_information} = req.body;
+    connection.query(`UPDATE company set vision="${vision}", mission="${mission}", add_information="${add_information}" WHERE companyId = ${companyId}`, [vision, mission, add_information], (error, results) => {
+        if (error) {
+            console.error("Error executing query: " + error);
+            res.status(500).send("Error updating company");
+            return;
+        }
+        res.status(200).send("Successful");
+    });
+});
+
 app.get("/home/company", (req, res)=>{
     connection.query('SELECT companyId, company_name from company ', (error, results)=> {
         if (error) {
@@ -168,7 +240,7 @@ app.get("/home/company", (req, res)=>{
 
 //JOB
 
-app.get("/job", (req, res)=>{
+app.get("/jobs", (req, res)=>{
     connection.query('SELECT * from job ', (error, results)=> {
         if (error) {
             console.error("Error executing query:"+ error);
@@ -179,6 +251,18 @@ app.get("/job", (req, res)=>{
     });
 });
 
+
+app.get("/job/:jobId", (req, res)=>{
+    const { jobId} = req.params;
+    connection.query('SELECT * from job WHERE jobId = ?',[jobId], (error, results)=> {
+        if (error) {
+            console.error("Error executing query:"+ error);
+            res.status(500).send("Error retrieving job");
+            return;
+        }
+        res.json(results);
+    });
+});
 
 app.post('/post/job', (req, res) => {
     const {
@@ -192,6 +276,7 @@ app.post('/post/job', (req, res) => {
       add_information,
       company_information,
       requirements
+
     } = req.body;
     connection.query("INSERT INTO job (companyId, job_name, role, salary, opportunities, location, time_type, add_information, company_information, requirements) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [companyId, job_name, role, salary, opportunities, location, time_type, add_information, company_information, requirements], (error, results) => {
         if (error) {
@@ -203,3 +288,43 @@ app.post('/post/job', (req, res) => {
     });
   });
   
+
+  app.get("/card", (req, res)=>{
+    connection.query('SELECT job_name, salary, created_date, location from job', (error, results)=> {
+        if (error) {
+            console.error("Error executing query:"+ error);
+            res.status(500).send("Error retrieving job");
+            return;
+        }
+        res.json(results);
+    });
+});
+
+///CV
+  app.get("/cv", (req, res)=>{
+    connection.query('SELECT * from CV ', (error, results)=> {
+        if (error) {
+            console.error("Error executing query:"+ error);
+            res.status(500).send("Error retrieving job");
+            return;
+        }
+        res.json(results);
+    });
+});
+app.post('/post/cv', (req, res) => {
+    const {
+         userId, user_surname, register_number, birthdate, gender, city, district, location, working_company, authority, started_working, ended_working, occupation, skill, add_information
+    } = req.body;
+    
+    const sql = "INSERT INTO CV ( userId, user_surname, register_number, birthdate, gender, city, district, location, working_company, authority, started_working, ended_working, occupation, skill, add_information) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    
+    const values = [ userId, user_surname, register_number, birthdate, gender, city, district, location, working_company, authority, started_working, ended_working, occupation, skill, add_information];
+    
+    connection.query(sql, values, (error, results) => {
+        if (error) {
+            console.error("Error executing query:", error);
+            return res.status(500).send("Error inserting CV data");
+        }
+        res.json(results);
+    });
+});
